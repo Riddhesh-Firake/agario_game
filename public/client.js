@@ -45,66 +45,67 @@ joinBtn.addEventListener('click', () => {
     });
 
     // 3. Engine Frame Processing
+    // Engine Frame Processing
     socket.on('gameState', (state) => {
         const { players, food, mapWidth, mapHeight } = state;
         
-        // Safety check: if our ID hasn't registered yet, try reading it from the socket object directly
         if (!myId && socket) {
             myId = socket.id;
         }
 
         const me = players[myId];
 
-        // Reset canvas frame buffer
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.save();
-        
-        // CAMERA SYSTEM DETECTOR:
-        if (me) {
-            // Lock camera layout precisely over our local sphere center point
-            ctx.translate(canvas.width / 2 - me.x, canvas.height / 2 - me.y);
-        } else {
-            // Fallback: Default to center map workspace coordinates if ID matching takes an extra tick
-            ctx.translate(canvas.width / 2 - (mapWidth / 2), canvas.height / 2 - (mapHeight / 2));
-        }
+        // 1. Clear the canvas frame buffer completely
+        ctx.fillStyle = '#fbfbfb';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Draw Map Border Area
+        // If our local player blob hasn't spawned into the server state array yet, skip rendering this frame
+        if (!me) return;
+
+        // 2. CAMERA CALCULATION: Find the center screen anchoring offsets
+        const camX = canvas.width / 2 - me.x;
+        const camY = canvas.height / 2 - me.y;
+
+        // 3. DRAW MAP BORDER: Offset the map walls relative to our camera positioning
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 8;
-        ctx.strokeRect(0, 0, mapWidth, mapHeight);
+        ctx.lineWidth = 6;
+        ctx.strokeRect(0 + camX, 0 + camY, mapWidth, mapHeight);
         
-        // Render Internal Grid Matrix Paths
+        // 4. RENDER BACKGROUND GRID LINES: Draw them relative to the camera vector position
         ctx.beginPath();
-        for(let x = 0; x <= mapWidth; x += 100) {
-            ctx.moveTo(x, 0); ctx.lineTo(x, mapHeight);
-        }
-        for(let y = 0; y <= mapHeight; y += 100) {
-            ctx.moveTo(0, y); ctx.lineTo(mapWidth, y);
-        }
-        ctx.strokeStyle = '#e3e3e3';
+        ctx.strokeStyle = '#e8e8e8';
         ctx.lineWidth = 1;
+        // Draw vertical column grid ticks
+        for (let x = 0; x <= mapWidth; x += 100) {
+            ctx.moveTo(x + camX, 0 + camY);
+            ctx.lineTo(x + camX, mapHeight + camY);
+        }
+        // Draw horizontal row grid ticks
+        for (let y = 0; y <= mapHeight; y += 100) {
+            ctx.moveTo(0 + camX, y + camY);
+            ctx.lineTo(mapWidth + camX, y + camY);
+        }
         ctx.stroke();
 
-        // Draw Food Elements
+        // 5. RENDER ALL FOOD PELLETS
         for (let i = 0; i < food.length; i++) {
             const f = food[i];
-            ctx.beginPath();
-            ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
-            ctx.fillStyle = f.color;
-            ctx.fill();
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-            ctx.stroke();
-            ctx.closePath();
+            // Only draw food if it is roughly inside the player's viewing screen window to optimize performance
+            if (f.x + camX >= 0 && f.x + camX <= canvas.width && f.y + camY >= 0 && f.y + camY <= canvas.height) {
+                ctx.beginPath();
+                ctx.arc(f.x + camX, f.y + camY, f.radius, 0, Math.PI * 2);
+                ctx.fillStyle = f.color;
+                ctx.fill();
+                ctx.closePath();
+            }
         }
 
-        // Draw Players Outer Spheres
+        // 6. RENDER ALL ACTIVE PLAYER BLOBS
         for (let id in players) {
             const p = players[id];
             
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.arc(p.x + camX, p.y + camY, p.radius, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.fill();
             ctx.lineWidth = 4;
@@ -112,33 +113,27 @@ joinBtn.addEventListener('click', () => {
             ctx.stroke();
             ctx.closePath();
 
-            // Text Label Configuration
+            // Render text name configuration overhead tags inside blobs
             ctx.fillStyle = '#000000';
             ctx.font = `bold ${Math.max(14, p.radius * 0.35)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(id === myId ? "You" : "Blob", p.x, p.y);
+            ctx.fillText(id === myId ? "You" : "Blob", p.x + camX, p.y + camY);
         }
 
-        ctx.restore(); // Revert matrix translation layout modifications for clean HUD text layers
+        // 7. DRAW SCOREBOARD FIXED HEADS-UP UI (HUD) OVERLAY
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.fillRect(25, 25, 150, 50);
+        ctx.strokeRect(25, 25, 150, 50);
 
-        // Draw Scoreboard UI Overlay HUD
-        if (me) {
-            // Draw a bold tracking card background box
-            ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3;
-            ctx.fillRect(20, 20, 160, 50);
-            ctx.strokeRect(20, 20, 160, 50);
-
-            ctx.fillStyle = '#000000';
-            ctx.font = 'bold 18px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(`Mass: ${Math.floor(me.radius)}`, 35, 52);
-        }
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(`Score: ${Math.floor(me.radius * 10 - 240)}`, 40, 56);
     });
-});
-
 window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
