@@ -15,7 +15,7 @@ joinBtn.addEventListener('click', () => {
     uiLayer.style.display = 'none';
     
     // 1. Establish the connection immediately
-    socket = io();
+    socket = io('https://blob-io-route-t-r-uongh-i-e-n-mai-dev.apps.rm1.0a51.p1.openshiftapps.com');
 
     // 2. Explicitly capture the true underlying socket ID on connect
     socket.on('connect', () => {
